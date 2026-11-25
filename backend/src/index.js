@@ -53,6 +53,7 @@ app.use(require('./routes/github'));
 app.use(require('./routes/admin'));
 app.use(require('./routes/sse'));
 app.use(require('./routes/tokens'));
+app.use(require('./routes/state'));
 
 // Serve frontend static files
 const publicDir = path.join(__dirname, '..', 'public');

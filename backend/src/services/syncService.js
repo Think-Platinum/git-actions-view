@@ -30,14 +30,15 @@ function upsertRun(run, ownerName, repoName, workflowName) {
   const stmt = db.prepare(`
     INSERT INTO workflow_runs (id, workflow_id, owner_name, repo_name, workflow_name, run_number,
       status, conclusion, event, branch, actor_login, actor_avatar_url, actor_type, html_url,
-      created_at, updated_at, run_started_at, run_attempt, pull_request_url)
+      created_at, updated_at, run_started_at, run_attempt, pull_request_url, head_sha)
     VALUES (@id, @workflow_id, @owner_name, @repo_name, @workflow_name, @run_number,
       @status, @conclusion, @event, @branch, @actor_login, @actor_avatar_url, @actor_type, @html_url,
-      @created_at, @updated_at, @run_started_at, @run_attempt, @pull_request_url)
+      @created_at, @updated_at, @run_started_at, @run_attempt, @pull_request_url, @head_sha)
     ON CONFLICT(id) DO UPDATE SET
       status = @status, conclusion = @conclusion, updated_at = @updated_at,
       run_started_at = @run_started_at, run_attempt = @run_attempt,
-      pull_request_url = @pull_request_url, actor_type = @actor_type
+      pull_request_url = @pull_request_url, actor_type = @actor_type,
+      head_sha = COALESCE(@head_sha, head_sha)
   `);
   stmt.run({
     id: run.id,
@@ -59,6 +60,7 @@ function upsertRun(run, ownerName, repoName, workflowName) {
     run_started_at: run.run_started_at || null,
     run_attempt: run.run_attempt || 1,
     pull_request_url: pullRequestUrl,
+    head_sha: typeof run.head_sha === 'string' ? run.head_sha.toLowerCase() : null,
   });
 }
 
