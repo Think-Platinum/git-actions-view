@@ -76,6 +76,27 @@ function runMigrations(db) {
       revoked_at   TEXT
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_api_tokens_hash ON api_tokens(token_hash);
+
+    -- Cached GitHub answers for the failure resolution endpoint (#11).
+    -- ref_kinds: whether a run's head_branch is a tag (GitHub runs do not say).
+    CREATE TABLE IF NOT EXISTS ref_kinds (
+      owner_name TEXT NOT NULL,
+      repo_name  TEXT NOT NULL,
+      ref        TEXT NOT NULL,
+      is_tag     INTEGER NOT NULL,
+      checked_at TEXT NOT NULL,
+      PRIMARY KEY (owner_name, repo_name, ref)
+    );
+    -- pr_states: open or closed (merged counts as closed) per pull request.
+    CREATE TABLE IF NOT EXISTS pr_states (
+      owner_name TEXT NOT NULL,
+      repo_name  TEXT NOT NULL,
+      number     INTEGER NOT NULL,
+      state      TEXT NOT NULL,
+      merged     INTEGER NOT NULL DEFAULT 0,
+      checked_at TEXT NOT NULL,
+      PRIMARY KEY (owner_name, repo_name, number)
+    );
   `);
 
   // Add pull_request_url column if it doesn't exist (idempotent migration)
@@ -98,6 +119,15 @@ function runMigrations(db) {
   } catch (e) {
     // Column already exists — ignore
   }
+
+  // Add head_sha to workflow_runs (#11). Rows synced before this column existed
+  // stay NULL until discovery or a webhook re-reads them.
+  try {
+    db.exec('ALTER TABLE workflow_runs ADD COLUMN head_sha TEXT');
+  } catch (e) {
+    // Column already exists - ignore
+  }
+  db.exec('CREATE INDEX IF NOT EXISTS idx_runs_repo_sha ON workflow_runs(owner_name, repo_name, head_sha)');
 }
 
 module.exports = { runMigrations };

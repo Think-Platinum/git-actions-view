@@ -114,6 +114,28 @@ async function listRunJobs(owner, repo, runId, accessToken) {
   return jobs;
 }
 
+/**
+ * Whether `ref` is an existing tag. Uses the exact-match ref endpoint, so a tag
+ * `v1` does not match `v1.0`. Resolves true or false; other errors throw.
+ */
+async function isTag(owner, repo, ref, { timeout } = {}) {
+  const client = createClient();
+  const encoded = ref.split('/').map(encodeURIComponent).join('/');
+  try {
+    const res = await client.get(`/repos/${owner}/${repo}/git/ref/tags/${encoded}`, { timeout });
+    return res.data?.ref === `refs/tags/${ref}`;
+  } catch (err) {
+    if (err.response?.status === 404) return false;
+    throw err;
+  }
+}
+
+async function getPullRequest(owner, repo, number, { timeout } = {}) {
+  const client = createClient();
+  const res = await client.get(`/repos/${owner}/${repo}/pulls/${number}`, { timeout });
+  return res.data;
+}
+
 async function listUserRepos(accessToken) {
   const client = createClient(accessToken);
   const repos = [];
@@ -147,5 +169,7 @@ module.exports = {
   getWorkflowRun,
   listRunJobs,
   listUserRepos,
+  isTag,
+  getPullRequest,
   _resetEtagCache,
 };
