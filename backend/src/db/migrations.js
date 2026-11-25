@@ -62,6 +62,20 @@ function runMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_runs_conclusion ON workflow_runs(conclusion);
     CREATE INDEX IF NOT EXISTS idx_runs_branch ON workflow_runs(branch);
     CREATE INDEX IF NOT EXISTS idx_jobs_run_id ON workflow_jobs(run_id);
+
+    -- Read-only API tokens for headless clients (#9). Only the SHA-256 hash of
+    -- a token is stored; the full value is shown once, at creation.
+    CREATE TABLE IF NOT EXISTS api_tokens (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      name         TEXT NOT NULL,
+      token_hash   TEXT NOT NULL,
+      prefix       TEXT NOT NULL,
+      created_by   TEXT,
+      created_at   TEXT NOT NULL,
+      last_used_at TEXT,
+      revoked_at   TEXT
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_api_tokens_hash ON api_tokens(token_hash);
   `);
 
   // Add pull_request_url column if it doesn't exist (idempotent migration)
