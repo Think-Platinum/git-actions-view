@@ -12,7 +12,7 @@ function load() {
   jest.isolateModules(() => {
     process.env.DB_PATH = testDbPath;
     const express = require('express');
-    const { ensureAuthenticated, allowApiToken } = require('../src/auth/middleware');
+    const { ensureAuthenticated, allowApiToken, apiTokenRateLimit } = require('../src/auth/middleware');
     const apiTokens = require('../src/services/apiTokens');
     const { getDb } = require('../src/db/database');
 
@@ -28,11 +28,11 @@ function load() {
     });
     app.use(require('../src/routes/tokens'));
     app.use(require('../src/routes/runs'));
-    app.get('/test/token-eligible', allowApiToken, (req, res) => {
+    app.get('/test/token-eligible', apiTokenRateLimit, allowApiToken, (req, res) => {
       res.json({ apiToken: req.apiToken || null });
     });
-    app.post('/test/token-eligible', allowApiToken, (req, res) => res.json({ ok: true }));
-    app.get('/test/session-only', ensureAuthenticated, (req, res) => res.json({ ok: true }));
+    app.post('/test/token-eligible', apiTokenRateLimit, allowApiToken, (req, res) => res.json({ ok: true }));
+    app.get('/test/session-only', apiTokenRateLimit, ensureAuthenticated, (req, res) => res.json({ ok: true }));
 
     mods = { app, apiTokens, getDb };
   });
@@ -169,6 +169,54 @@ describe('API tokens (#9 backend slice)', () => {
       const res = await request(app).get('/test/token-eligible').set('Authorization', 'Bearer gav_bad');
       expect(res.status).toBe(200);
       expect(res.body.apiToken).toBeNull();
+    });
+  });
+
+  describe('rate limits', () => {
+    test('token-eligible routes throttle a client after 120 requests a minute, before any lookup', async () => {
+      const { app } = load();
+      for (let i = 0; i < 120; i++) {
+        const res = await request(app).get('/test/token-eligible').set('Authorization', 'Bearer gav_guess');
+        expect(res.status).toBe(401);
+      }
+      const limited = await request(app).get('/test/token-eligible').set('Authorization', 'Bearer gav_guess');
+      expect(limited.status).toBe(429);
+      expect(limited.body).toEqual({ error: 'Too many requests' });
+    });
+
+    test('token management throttles a client after 30 requests in 15 minutes', async () => {
+      const { app } = load();
+      for (let i = 0; i < 30; i++) {
+        expect((await request(app).get('/api/v1/tokens').set('x-test-session', '1')).status).toBe(200);
+      }
+      expect((await request(app).get('/api/v1/tokens').set('x-test-session', '1')).status).toBe(429);
+    });
+  });
+
+  describe('csrfProtection', () => {
+    function check(req) {
+      let csrfProtection;
+      jest.isolateModules(() => {
+        ({ csrfProtection } = require('../src/auth/middleware'));
+      });
+      const next = jest.fn();
+      const json = jest.fn();
+      const res = { status: jest.fn().mockReturnValue({ json }) };
+      csrfProtection({ headers: {}, ...req }, res, next);
+      return next.mock.calls.length ? 'passed' : res.status.mock.calls[0][0];
+    }
+
+    test('refuses a foreign Origin or Referer and accepts the configured one', () => {
+      expect(check({ headers: { origin: 'https://evil.example' } })).toBe(403);
+      expect(check({ headers: { referer: 'https://evil.example/page' } })).toBe(403);
+      expect(check({ headers: { origin: 'http://gav.local:9000' } })).toBe('passed');
+      expect(check({ headers: {} })).toBe('passed');
+    });
+
+    test('with sameSite=none a missing Origin is refused, unless the caller used a bearer token', () => {
+      process.env.COOKIE_SAME_SITE = 'none';
+      expect(check({ headers: {} })).toBe(403);
+      expect(check({ headers: {}, apiToken: { id: 1, name: 'auden' } })).toBe('passed');
     });
   });
 
