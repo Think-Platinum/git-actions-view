@@ -1,6 +1,6 @@
 const express = require('express');
 const config = require('../config');
-const { ensureAuthenticated } = require('../auth/middleware');
+const { ensureAuthenticated, tokenAdminRateLimit, csrfProtection } = require('../auth/middleware');
 const apiTokens = require('../services/apiTokens');
 
 // Token management (#9). Session-only: these routes use ensureAuthenticated,
@@ -15,37 +15,18 @@ function requireAuthEnabled(req, res, next) {
   next();
 }
 
-// Cross-site guard for state-changing calls. With the default sameSite=lax
-// cookie a cross-site POST carries no session anyway; with COOKIE_SAME_SITE=none
-// it would, so a foreign or (in that mode) missing Origin is refused.
-function requireSameOrigin(req, res, next) {
-  const expected = new URL(config.baseUrl).origin;
-  let origin = req.headers.origin;
-  if (!origin && req.headers.referer) {
-    try {
-      origin = new URL(req.headers.referer).origin;
-    } catch {
-      origin = 'invalid';
-    }
-  }
-  if (origin ? origin !== expected : config.cookieSameSite === 'none') {
-    return res.status(403).json({ error: 'Cross-origin request refused' });
-  }
-  next();
-}
-
 function auditLog(action, req, record) {
   // Never log the token or its hash.
   const actor = req.user?.login || 'unknown';
   console.log(`[tokens] ${action} id=${record.id} name="${record.name}" prefix=${record.prefix} by=${actor}`);
 }
 
-router.get('/api/v1/tokens', requireAuthEnabled, ensureAuthenticated, (req, res) => {
+router.get('/api/v1/tokens', tokenAdminRateLimit, requireAuthEnabled, ensureAuthenticated, (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json({ tokens: apiTokens.listTokens() });
 });
 
-router.post('/api/v1/tokens', requireAuthEnabled, ensureAuthenticated, requireSameOrigin, (req, res) => {
+router.post('/api/v1/tokens', tokenAdminRateLimit, requireAuthEnabled, ensureAuthenticated, csrfProtection, (req, res) => {
   const name = req.body?.name;
   if (typeof name !== 'string' || !name.trim() || name.trim().length > apiTokens.MAX_NAME_LENGTH) {
     return res.status(400).json({ error: `name must be 1-${apiTokens.MAX_NAME_LENGTH} characters` });
@@ -56,7 +37,7 @@ router.post('/api/v1/tokens', requireAuthEnabled, ensureAuthenticated, requireSa
   res.status(201).json(created);
 });
 
-router.delete('/api/v1/tokens/:id', requireAuthEnabled, ensureAuthenticated, requireSameOrigin, (req, res) => {
+router.delete('/api/v1/tokens/:id', tokenAdminRateLimit, requireAuthEnabled, ensureAuthenticated, csrfProtection, (req, res) => {
   if (!/^\d+$/.test(req.params.id)) {
     return res.status(400).json({ error: 'Invalid token id' });
   }
