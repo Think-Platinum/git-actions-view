@@ -514,6 +514,23 @@ describe('POST /api/v1/state/resolve (#11)', () => {
       expect(ok.status).toBe(200);
       expect(ok.body.results[0].reason).toBe('still_failing');
 
+      // A bearer caller (no Origin header) is not subject to the CSRF check,
+      // even with sameSite=none cookies.
+      process.env.COOKIE_SAME_SITE = 'none';
+      const { app: noneApp, db: noneDb, apiTokens: noneTokens } = load();
+      const { token: noneToken } = noneTokens.createToken('auden-2');
+      expect(noneDb).toBeDefined();
+      const bearer = await request(noneApp)
+        .post('/api/v1/state/resolve')
+        .set('Authorization', `Bearer ${noneToken}`)
+        .send({ failures: [] });
+      expect(bearer.status).toBe(200);
+      const foreign = await request(noneApp)
+        .post('/api/v1/state/resolve')
+        .set('Origin', 'https://evil.example')
+        .send({ failures: [] });
+      expect(foreign.status).toBe(401);
+
       apiTokens.revokeToken(id);
       const revoked = await request(app)
         .post('/api/v1/state/resolve')

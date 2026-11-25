@@ -1,5 +1,5 @@
 const express = require('express');
-const { allowApiToken } = require('../auth/middleware');
+const { allowApiToken, apiTokenRateLimit, csrfProtection } = require('../auth/middleware');
 const { resolveFailures, MAX_BATCH } = require('../services/resolveService');
 
 const router = express.Router();
@@ -7,9 +7,10 @@ const router = express.Router();
 /**
  * POST /api/v1/state/resolve (#11). Read-only despite the method: a batch body
  * is simpler than a list in a query string. Opts in to read-only API tokens.
+ * csrfProtection only applies to session callers; bearer callers skip it.
  * Contract: docs/state-resolve-api.md.
  */
-router.post('/api/v1/state/resolve', allowApiToken, async (req, res) => {
+router.post('/api/v1/state/resolve', apiTokenRateLimit, allowApiToken, csrfProtection, async (req, res) => {
   res.set('Cache-Control', 'no-store');
   const failures = req.body?.failures;
   if (!Array.isArray(failures)) {
