@@ -116,6 +116,31 @@ describe('syncService', () => {
     expect(row.conclusion).toBe('failure');
   });
 
+  test('upsertRun stores head_sha on insert and on conflict, keeping it when omitted (#11)', () => {
+    const db = getDb();
+
+    syncService.upsertWorkflow({ id: 1, name: 'CI' }, 'org', 'repo');
+    const baseRun = {
+      id: 101, workflow_id: 1, run_number: 43, status: 'in_progress', conclusion: null,
+      created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:01:00Z',
+    };
+    const sha = () => db.prepare('SELECT head_sha FROM workflow_runs WHERE id = 101').get().head_sha;
+
+    syncService.upsertRun({ ...baseRun, head_sha: 'EF22F09AAAA' }, 'org', 'repo', 'CI');
+    expect(sha()).toBe('ef22f09aaaa');
+
+    syncService.upsertRun({ ...baseRun, status: 'completed', conclusion: 'success' }, 'org', 'repo', 'CI');
+    expect(sha()).toBe('ef22f09aaaa');
+
+    syncService.upsertRun({ ...baseRun, head_sha: '0a1e3140000' }, 'org', 'repo', 'CI');
+    expect(sha()).toBe('0a1e3140000');
+
+    // A row written before head_sha existed gains it on the next sync.
+    db.prepare('UPDATE workflow_runs SET head_sha = NULL WHERE id = 101').run();
+    syncService.upsertRun({ ...baseRun, head_sha: 'abcdef1234' }, 'org', 'repo', 'CI');
+    expect(sha()).toBe('abcdef1234');
+  });
+
   test('upsertRun handles null optional fields', () => {
     const db = getDb();
 
