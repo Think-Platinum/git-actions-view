@@ -15,6 +15,8 @@ const mockRebuildDatabase = vi.fn()
 const mockFetchGithubRepos = vi.fn()
 const mockFetchDbStats = vi.fn()
 const mockFetchRepoStats = vi.fn()
+const mockFetchRepoWorkflows = vi.fn()
+const mockSetWorkflowStatusMode = vi.fn()
 
 vi.mock('@/services/api', () => ({
   fetchSettings: (...args) => mockFetchSettings(...args),
@@ -27,6 +29,9 @@ vi.mock('@/services/api', () => ({
   fetchGithubRepos: (...args) => mockFetchGithubRepos(...args),
   fetchDbStats: (...args) => mockFetchDbStats(...args),
   fetchRepoStats: (...args) => mockFetchRepoStats(...args),
+  // RepoWorkflowSettings (#6)
+  fetchRepoWorkflows: (...args) => mockFetchRepoWorkflows(...args),
+  setWorkflowStatusMode: (...args) => mockSetWorkflowStatusMode(...args),
   // ApiTokensCard (#9): auth disabled here, so the card stays hidden.
   fetchConfig: () => Promise.resolve({ authRequired: false }),
   fetchApiTokens: () => Promise.resolve({ tokens: [] }),
@@ -70,6 +75,9 @@ describe('SettingsPage', () => {
     mockFetchGithubRepos.mockReset()
     mockFetchDbStats.mockReset()
     mockFetchRepoStats.mockReset()
+    mockFetchRepoWorkflows.mockReset()
+    mockSetWorkflowStatusMode.mockReset()
+    mockFetchRepoWorkflows.mockResolvedValue({ workflows: [] })
 
     mockFetchSettings.mockResolvedValue({ discoveryPollSeconds: 60, activePollSeconds: 10 })
     mockFetchDbStats.mockResolvedValue({
@@ -275,6 +283,70 @@ describe('SettingsPage', () => {
 
       expect(mockUpdateRepo).toHaveBeenCalledWith(1, { defaultBranchOverride: null })
       expect(wrapper.find('[data-testid="effective-branch"]').text()).toBe('develop')
+    })
+  })
+
+  describe('workflows that count (#6)', () => {
+    const repo = {
+      id: 1, owner: 'test-org', name: 'my-repo', hidden: 0, created_at: '2026-01-01',
+      defaultBranch: 'main', defaultBranchOverride: null, effectiveDefaultBranch: 'main',
+    }
+    const wfs = [
+      { id: 10, name: 'CI', path: '.github/workflows/ci.yml', state: 'active', statusMode: null, countsTowardStatus: true, reason: 'default:push' },
+      { id: 11, name: 'Launch Production', path: '.github/workflows/launch.yml', state: 'active', statusMode: null, countsTowardStatus: false, reason: 'default:excluded-manual' },
+      { id: 12, name: 'Copilot', path: 'dynamic/agents/copilot', state: 'active', statusMode: null, countsTowardStatus: false, reason: 'default:excluded-managed' },
+    ]
+
+    async function expandRepo(wrapper) {
+      const row = wrapper.findAll('tr').find(r => r.text().includes('test-org/my-repo'))
+      await row.trigger('click')
+      await flushPromises()
+    }
+
+    beforeEach(() => {
+      mockFetchRepos.mockResolvedValue({ repos: [repo] })
+      mockFetchRepoStats.mockResolvedValue({ runCount: 1, workflowCount: 3, jobCount: 1, estimatedSizeBytes: 0, latestRun: null })
+      mockFetchRepoWorkflows.mockResolvedValue({ effectiveDefaultBranch: 'main', workflows: wfs.map(w => ({ ...w })) })
+    })
+
+    it('shows each workflow with the reason it does or does not count', async () => {
+      const wrapper = mountSettings()
+      await flushPromises()
+      await expandRepo(wrapper)
+      expect(mockFetchRepoWorkflows).toHaveBeenCalledWith(1)
+      const reasons = wrapper.findAll('[data-testid="workflow-reason"]').map(c => c.text())
+      expect(reasons).toEqual(['Runs on push', 'Manual or scheduled', 'GitHub-managed'])
+    })
+
+    it('saves a change and shows the new reason', async () => {
+      mockSetWorkflowStatusMode.mockResolvedValue({
+        workflow: { ...wfs[1], statusMode: 'include', countsTowardStatus: true, reason: 'explicit:include' },
+      })
+      const wrapper = mountSettings()
+      await flushPromises()
+      await expandRepo(wrapper)
+
+      const select = wrapper.findComponent('[data-testid="workflow-mode-11"]')
+      select.vm.$emit('update:modelValue', 'include')
+      await flushPromises()
+
+      expect(mockSetWorkflowStatusMode).toHaveBeenCalledWith(1, 11, 'include')
+      expect(wrapper.find('[data-testid="workflow-row-11"]').text()).toContain('Included')
+    })
+
+    it('resetting to the default rule sends null', async () => {
+      mockFetchRepoWorkflows.mockResolvedValue({
+        workflows: [{ ...wfs[0], statusMode: 'exclude', countsTowardStatus: false, reason: 'explicit:exclude' }],
+      })
+      mockSetWorkflowStatusMode.mockResolvedValue({ workflow: { ...wfs[0] } })
+      const wrapper = mountSettings()
+      await flushPromises()
+      await expandRepo(wrapper)
+
+      wrapper.findComponent('[data-testid="workflow-mode-10"]').vm.$emit('update:modelValue', 'default')
+      await flushPromises()
+      expect(mockSetWorkflowStatusMode).toHaveBeenCalledWith(1, 10, null)
+      expect(wrapper.find('[data-testid="workflow-row-10"]').text()).toContain('Runs on push')
     })
   })
 })

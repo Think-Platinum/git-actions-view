@@ -280,6 +280,7 @@
                     </div>
                     <div v-else class="text-body-2 text-medium-emphasis">Failed to load metrics.</div>
                     <RepoBranchSettings :repo="repo" @updated="(updated) => onRepoUpdated(repo, updated)" />
+                    <RepoWorkflowSettings :repo="repo" />
                   </v-card>
                 </td>
               </tr>
@@ -338,6 +339,7 @@ import {
 import { useSyncStatus } from '@/composables/useSyncStatus'
 import ApiTokensCard from '@/components/ApiTokensCard.vue'
 import RepoBranchSettings from '@/components/RepoBranchSettings.vue'
+import RepoWorkflowSettings from '@/components/RepoWorkflowSettings.vue'
 
 const syncState = useSyncStatus()
 

@@ -17,6 +17,18 @@ const apiTokenRateLimit = rateLimit({
   message: TOO_MANY,
 });
 
+/**
+ * General per-client limit for session routes added since #6 (settings-style
+ * reads and writes). Generous for interactive use.
+ */
+const sessionRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 300,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: TOO_MANY,
+});
+
 /** Stricter limit for token management (create, list, revoke). */
 const tokenAdminRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -114,6 +126,7 @@ module.exports = {
   allowApiToken,
   apiTokenRateLimit,
   tokenAdminRateLimit,
+  sessionRateLimit,
   csrfProtection,
   getAccessToken,
 };

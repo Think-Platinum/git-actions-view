@@ -1,6 +1,12 @@
 jest.mock('../src/services/syncService');
 jest.mock('../src/services/reposService');
 jest.mock('../src/services/rateLimitTracker');
+jest.mock('../src/services/workflowSelection');
+
+// Drain pending promise callbacks (fake timers do not affect microtasks).
+async function flushMicrotasks(rounds = 20) {
+  for (let i = 0; i < rounds; i++) await Promise.resolve();
+}
 
 describe('syncDispatcher', () => {
   const originalEnv = process.env;
@@ -163,9 +169,9 @@ describe('syncDispatcher', () => {
     const dispatcher = require('../src/services/syncDispatcher');
     dispatcher.start();
 
-    // Wait for discovery to complete
-    await Promise.resolve();
-    await Promise.resolve();
+    // Wait for discovery to complete (it awaits the branch refresh, the run
+    // sync and the push-evidence backfill in turn).
+    await flushMicrotasks();
 
     // Advance time past the 30 minute timeout
     jest.advanceTimersByTime(31 * 60 * 1000);

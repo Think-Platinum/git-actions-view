@@ -136,6 +136,13 @@ async function getPullRequest(owner, repo, number, { timeout } = {}) {
   return res.data;
 }
 
+/** Runs of one workflow, e.g. the latest push run on a branch (#6). */
+async function listRunsForWorkflow(owner, repo, workflowId, params = {}, accessToken) {
+  const client = createClient(accessToken);
+  const res = await client.get(`/repos/${owner}/${repo}/actions/workflows/${workflowId}/runs`, { params });
+  return res.data;
+}
+
 /** The repository resource; used for `default_branch` (#5). */
 async function getRepo(owner, repo, accessToken) {
   const client = createClient(accessToken);
@@ -177,6 +184,7 @@ module.exports = {
   listRunJobs,
   listUserRepos,
   getRepo,
+  listRunsForWorkflow,
   isTag,
   getPullRequest,
   _resetEtagCache,

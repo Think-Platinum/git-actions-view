@@ -1,9 +1,10 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const { ensureAuthenticated } = require('../auth/middleware');
+const { ensureAuthenticated, sessionRateLimit } = require('../auth/middleware');
 const { getDb } = require('../db/database');
 const reposService = require('../services/reposService');
+const workflowSelection = require('../services/workflowSelection');
 const syncDispatcher = require('../services/syncDispatcher');
 const config = require('../config');
 
@@ -67,6 +68,47 @@ router.put('/api/v1/repos/:id', ensureAuthenticated, (req, res) => {
   if (hasOverride) repo = reposService.setDefaultBranchOverride(id, override.value);
 
   res.json({ repo: reposService.toApi(repo) });
+});
+
+/**
+ * GET /api/v1/repos/:id/workflows — the repo's workflows, whether each counts
+ * toward status, and why (#6).
+ */
+router.get('/api/v1/repos/:id/workflows', sessionRateLimit, ensureAuthenticated, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const repo = reposService.getAllRepos().find(r => r.id === id);
+  if (!repo) {
+    return res.status(404).json({ error: 'Repository not found' });
+  }
+  res.json({ effectiveDefaultBranch: reposService.effectiveDefaultBranch(repo), workflows: workflowSelection.listRepoWorkflows(repo) });
+});
+
+/**
+ * PUT /api/v1/repos/:id/workflows/:workflowId — set `statusMode` to
+ * 'include' or 'exclude', or null to return to the default rule (#6).
+ */
+router.put('/api/v1/repos/:id/workflows/:workflowId', sessionRateLimit, ensureAuthenticated, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!/^\d+$/.test(req.params.workflowId)) {
+    return res.status(400).json({ error: 'Invalid workflow id' });
+  }
+  const body = req.body || {};
+  if (!Object.prototype.hasOwnProperty.call(body, 'statusMode')) {
+    return res.status(400).json({ error: 'statusMode is required' });
+  }
+  const mode = body.statusMode;
+  if (mode !== null && !workflowSelection.STATUS_MODES.includes(mode)) {
+    return res.status(400).json({ error: 'statusMode must be "include", "exclude" or null' });
+  }
+  const repo = reposService.getAllRepos().find(r => r.id === id);
+  if (!repo) {
+    return res.status(404).json({ error: 'Repository not found' });
+  }
+  const workflow = workflowSelection.setStatusMode(repo, Number(req.params.workflowId), mode);
+  if (!workflow) {
+    return res.status(404).json({ error: 'Workflow not found for this repository' });
+  }
+  res.json({ workflow });
 });
 
 /**
