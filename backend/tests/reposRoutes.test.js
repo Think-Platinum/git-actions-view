@@ -36,7 +36,9 @@ describe('repos routes', () => {
     delete process.env.GITHUB_OAUTH2_CLIENT_SECRET;
     delete process.env.BASIC_AUTH_USER_DETAILS_FILE_PATH;
     process.env.DB_PATH = testDbPath;
-    if (fs.existsSync(testDbPath)) fs.unlinkSync(testDbPath);
+    // Remove the WAL and SHM files too: SQLite replays a leftover WAL into a
+    // fresh database of the same name, which made these tests intermittently fail.
+    for (const s of ['', '-wal', '-shm']) if (fs.existsSync(testDbPath + s)) fs.unlinkSync(testDbPath + s);
     // Initialise DB
     jest.isolateModules(() => {
       process.env.DB_PATH = testDbPath;
@@ -51,7 +53,9 @@ describe('repos routes', () => {
         require('../src/db/database').closeDb();
       });
     } catch { /* ignore */ }
-    if (fs.existsSync(testDbPath)) fs.unlinkSync(testDbPath);
+    // Remove the WAL and SHM files too: SQLite replays a leftover WAL into a
+    // fresh database of the same name, which made these tests intermittently fail.
+    for (const s of ['', '-wal', '-shm']) if (fs.existsSync(testDbPath + s)) fs.unlinkSync(testDbPath + s);
     process.env = { ...originalEnv };
   });
 

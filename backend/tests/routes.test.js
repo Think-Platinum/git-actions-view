@@ -82,7 +82,9 @@ describe('routes', () => {
     delete process.env.BASIC_AUTH_USER_DETAILS_FILE_PATH;
     process.env.GITHUB_REPOS = 'org1/repo-a,org2/repo-b';
     process.env.DB_PATH = testDbPath;
-    if (fs.existsSync(testDbPath)) fs.unlinkSync(testDbPath);
+    // Remove the WAL and SHM files too: SQLite replays a leftover WAL into a
+    // fresh database of the same name, which made these tests intermittently fail.
+    for (const s of ['', '-wal', '-shm']) if (fs.existsSync(testDbPath + s)) fs.unlinkSync(testDbPath + s);
   });
 
   afterEach(() => {
@@ -94,7 +96,9 @@ describe('routes', () => {
         closeDb();
       });
     } catch { /* ignore */ }
-    if (fs.existsSync(testDbPath)) fs.unlinkSync(testDbPath);
+    // Remove the WAL and SHM files too: SQLite replays a leftover WAL into a
+    // fresh database of the same name, which made these tests intermittently fail.
+    for (const s of ['', '-wal', '-shm']) if (fs.existsSync(testDbPath + s)) fs.unlinkSync(testDbPath + s);
     process.env = { ...originalEnv };
   });
 

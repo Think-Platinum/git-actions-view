@@ -31,7 +31,9 @@ describe('settings routes', () => {
     process.env.DB_PATH = testDbPath;
     process.env.DISCOVERY_POLL_SECONDS = '60';
     process.env.ACTIVE_POLL_SECONDS = '10';
-    if (fs.existsSync(testDbPath)) fs.unlinkSync(testDbPath);
+    // Remove the WAL and SHM files too: SQLite replays a leftover WAL into a
+    // fresh database of the same name, which made these tests intermittently fail.
+    for (const s of ['', '-wal', '-shm']) if (fs.existsSync(testDbPath + s)) fs.unlinkSync(testDbPath + s);
   });
 
   afterEach(() => {
@@ -41,7 +43,9 @@ describe('settings routes', () => {
         require('../src/db/database').closeDb();
       });
     } catch { /* ignore */ }
-    if (fs.existsSync(testDbPath)) fs.unlinkSync(testDbPath);
+    // Remove the WAL and SHM files too: SQLite replays a leftover WAL into a
+    // fresh database of the same name, which made these tests intermittently fail.
+    for (const s of ['', '-wal', '-shm']) if (fs.existsSync(testDbPath + s)) fs.unlinkSync(testDbPath + s);
     process.env = { ...originalEnv };
   });
 

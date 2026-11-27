@@ -165,6 +165,7 @@ When authentication is enabled, headless clients can use a read-only API token i
 
 | Endpoint | Description |
 |---|---|
+| `GET /api/health` | Liveness and the running version (`status`, `version`, `startedAt`, `uptimeSeconds`). No auth; 503 when the database is unavailable |
 | `GET /api/config` | Auth mechanisms, configured repositories |
 | `GET /api/me` | Current user info |
 | `GET /api/v1/runs` | Paginated runs (supports `limit`, `before`, `repo`, `status`, `branch`, `from`, `to`) |

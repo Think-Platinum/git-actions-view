@@ -34,7 +34,10 @@ function load() {
 /** Open a stream; resolves once the first bytes arrive (or a non-200 status). */
 function openStream(port, headers = {}) {
   return new Promise((resolve, reject) => {
-    const req = http.get({ host: '127.0.0.1', port, path: '/api/v1/events', headers }, res => {
+    // agent: false - no pooled keep-alive sockets. A pooled socket to this
+    // test's server could otherwise be reused by a later test in the same
+    // worker whose server gets the same port, and reach the wrong app.
+    const req = http.get({ host: '127.0.0.1', port, path: '/api/v1/events', headers, agent: false }, res => {
       const ended = new Promise(done => res.on('end', done).on('close', done));
       if (res.statusCode !== 200) {
         res.resume();
@@ -66,7 +69,10 @@ describe('/api/v1/events with API tokens (#9)', () => {
 
   afterEach(async () => {
     for (const s of streams) s.req.destroy();
-    if (server) await new Promise(r => server.close(r));
+    if (server) {
+      server.closeAllConnections();
+      await new Promise(r => server.close(r));
+    }
     server = null;
     jest.restoreAllMocks();
     try {
