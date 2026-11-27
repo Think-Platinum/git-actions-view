@@ -27,6 +27,11 @@ vi.mock('@/services/api', () => ({
   fetchGithubRepos: (...args) => mockFetchGithubRepos(...args),
   fetchDbStats: (...args) => mockFetchDbStats(...args),
   fetchRepoStats: (...args) => mockFetchRepoStats(...args),
+  // ApiTokensCard (#9): auth disabled here, so the card stays hidden.
+  fetchConfig: () => Promise.resolve({ authRequired: false }),
+  fetchApiTokens: () => Promise.resolve({ tokens: [] }),
+  createApiToken: vi.fn(),
+  revokeApiToken: vi.fn(),
 }))
 
 function createTestRouter() {

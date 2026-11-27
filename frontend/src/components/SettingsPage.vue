@@ -278,6 +278,9 @@
       </v-card-text>
     </v-card>
 
+    <!-- API tokens (#9) -->
+    <ApiTokensCard class="mt-4" />
+
     <!-- Rebuild Confirmation Dialog -->
     <v-dialog v-model="showRebuildDialog" max-width="420">
       <v-card>
@@ -321,6 +324,7 @@ import {
   fetchDbStats, fetchRepoStats,
 } from '@/services/api'
 import { useSyncStatus } from '@/composables/useSyncStatus'
+import ApiTokensCard from '@/components/ApiTokensCard.vue'
 
 const syncState = useSyncStatus()
 
