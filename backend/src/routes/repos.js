@@ -1,7 +1,7 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const { ensureAuthenticated } = require('../auth/middleware');
+const { ensureAuthenticated, sessionRateLimit } = require('../auth/middleware');
 const { getDb } = require('../db/database');
 const reposService = require('../services/reposService');
 const workflowSelection = require('../services/workflowSelection');
@@ -74,7 +74,7 @@ router.put('/api/v1/repos/:id', ensureAuthenticated, (req, res) => {
  * GET /api/v1/repos/:id/workflows — the repo's workflows, whether each counts
  * toward status, and why (#6).
  */
-router.get('/api/v1/repos/:id/workflows', ensureAuthenticated, (req, res) => {
+router.get('/api/v1/repos/:id/workflows', sessionRateLimit, ensureAuthenticated, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const repo = reposService.getAllRepos().find(r => r.id === id);
   if (!repo) {
@@ -87,7 +87,7 @@ router.get('/api/v1/repos/:id/workflows', ensureAuthenticated, (req, res) => {
  * PUT /api/v1/repos/:id/workflows/:workflowId — set `statusMode` to
  * 'include' or 'exclude', or null to return to the default rule (#6).
  */
-router.put('/api/v1/repos/:id/workflows/:workflowId', ensureAuthenticated, (req, res) => {
+router.put('/api/v1/repos/:id/workflows/:workflowId', sessionRateLimit, ensureAuthenticated, (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!/^\d+$/.test(req.params.workflowId)) {
     return res.status(400).json({ error: 'Invalid workflow id' });
