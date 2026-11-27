@@ -128,6 +128,16 @@ function runMigrations(db) {
     // Column already exists - ignore
   }
   db.exec('CREATE INDEX IF NOT EXISTS idx_runs_repo_sha ON workflow_runs(owner_name, repo_name, head_sha)');
+
+  // Default branch per repo (#5): GitHub's value, an optional override, and when
+  // GitHub's value was last fetched (refreshed at most hourly).
+  for (const column of ['default_branch TEXT', 'default_branch_override TEXT', 'default_branch_synced_at TEXT']) {
+    try {
+      db.exec(`ALTER TABLE repos ADD COLUMN ${column}`);
+    } catch (e) {
+      // Column already exists - ignore
+    }
+  }
 }
 
 module.exports = { runMigrations };

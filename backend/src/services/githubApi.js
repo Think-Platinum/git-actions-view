@@ -136,6 +136,13 @@ async function getPullRequest(owner, repo, number, { timeout } = {}) {
   return res.data;
 }
 
+/** The repository resource; used for `default_branch` (#5). */
+async function getRepo(owner, repo, accessToken) {
+  const client = createClient(accessToken);
+  const res = await client.get(`/repos/${owner}/${repo}`);
+  return res.data;
+}
+
 async function listUserRepos(accessToken) {
   const client = createClient(accessToken);
   const repos = [];
@@ -169,6 +176,7 @@ module.exports = {
   getWorkflowRun,
   listRunJobs,
   listUserRepos,
+  getRepo,
   isTag,
   getPullRequest,
   _resetEtagCache,
