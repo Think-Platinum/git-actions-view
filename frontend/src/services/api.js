@@ -10,7 +10,17 @@ async function request(url, options = {}) {
     throw new Error('Unauthorized')
   }
   if (!res.ok) {
-    throw new Error(`API error: ${res.status}`)
+    let message = `API error: ${res.status}`
+    try {
+      const data = await res.json()
+      if (data?.error) message = data.error
+    } catch {
+      // No JSON body: keep the status message
+    }
+    throw new Error(message)
+  }
+  if (res.status === 204) {
+    return null
   }
   return res.json()
 }
@@ -124,4 +134,23 @@ export function fetchDbStats() {
 // Repo stats API
 export function fetchRepoStats(id) {
   return request(`/api/v1/repos/${id}/stats`)
+}
+
+// API tokens (#9). Session-only; the full token value is returned once, by create.
+export function fetchApiTokens() {
+  return request('/api/v1/tokens')
+}
+
+export function createApiToken(name) {
+  return request('/api/v1/tokens', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+}
+
+export function revokeApiToken(id) {
+  return request(`/api/v1/tokens/${id}`, {
+    method: 'DELETE',
+  })
 }

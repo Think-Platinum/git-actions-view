@@ -2,6 +2,7 @@ const express = require('express');
 const config = require('../config');
 const { ensureAuthenticated, tokenAdminRateLimit, csrfProtection } = require('../auth/middleware');
 const apiTokens = require('../services/apiTokens');
+const { closeClientsForToken } = require('../services/sseManager');
 
 // Token management (#9). Session-only: these routes use ensureAuthenticated,
 // never allowApiToken, so a token cannot mint, list or revoke tokens.
@@ -46,7 +47,9 @@ router.delete('/api/v1/tokens/:id', tokenAdminRateLimit, requireAuthEnabled, ens
   if (!record || !apiTokens.revokeToken(id)) {
     return res.status(404).json({ error: 'Token not found' });
   }
-  auditLog('revoked', req, record);
+  // End any event streams the token still holds open.
+  const closed = closeClientsForToken(id);
+  auditLog(`revoked (closed ${closed} stream${closed === 1 ? '' : 's'})`, req, record);
   res.status(204).end();
 });
 

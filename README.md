@@ -153,6 +153,14 @@ Users will see a "Sign in with GitHub" button and authenticate via the standard 
 
 Both OAuth2 and basic auth can be enabled simultaneously.
 
+### API tokens (headless clients)
+
+When authentication is enabled, headless clients can use a read-only API token instead of a browser session: `Authorization: Bearer gav_...`. Tokens are only accepted on routes that opt in. Every other route stays session-only.
+
+- **Create** a token in **Settings → API tokens**, or on the host with `node src/cli/create-api-token.js <name>` (in Docker: `docker compose exec gitactionsview node src/cli/create-api-token.js <name>`). The value is shown once; only its hash is stored.
+- **Revoke** it from the same Settings card. A revoked token gets 401 at once, and any event streams it holds are closed.
+- **Token-readable routes:** `GET /api/v1/events` (at most 5 streams per token) and `POST /api/v1/state/resolve` ([contract](docs/state-resolve-api.md)).
+
 ## API
 
 | Endpoint | Description |
@@ -161,7 +169,9 @@ Both OAuth2 and basic auth can be enabled simultaneously.
 | `GET /api/me` | Current user info |
 | `GET /api/v1/runs` | Paginated runs (supports `limit`, `before`, `repo`, `status`, `branch`, `from`, `to`) |
 | `GET /api/v1/runs/:id/jobs` | Jobs for a specific run |
-| `GET /api/v1/events` | SSE stream of real-time sync updates (`sync:start`, `sync:complete`, `sync:poll`) |
+| `GET /api/v1/events` | SSE stream of real-time sync updates (`sync:start`, `sync:complete`, `sync:poll`). Accepts API tokens |
+| `GET`/`POST`/`DELETE /api/v1/tokens` | List, create and revoke API tokens (session only) |
+| `POST /api/v1/state/resolve` | Which reported Actions failures are still outstanding. Accepts API tokens ([contract](docs/state-resolve-api.md)) |
 | `GET /api/v1/settings` | Current polling interval settings |
 | `PUT /api/v1/settings` | Update polling intervals (restarts dispatcher) |
 | `GET /api/v1/repos` | List all repositories (including hidden) |
