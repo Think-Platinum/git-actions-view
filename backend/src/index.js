@@ -54,6 +54,7 @@ app.use(require('./routes/admin'));
 app.use(require('./routes/sse'));
 app.use(require('./routes/tokens'));
 app.use(require('./routes/state'));
+app.use(require('./routes/status'));
 
 // Serve frontend static files
 const publicDir = path.join(__dirname, '..', 'public');

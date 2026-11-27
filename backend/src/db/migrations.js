@@ -149,6 +149,8 @@ function runMigrations(db) {
     }
   }
   db.exec('CREATE INDEX IF NOT EXISTS idx_runs_workflow_event_branch ON workflow_runs(workflow_id, event, branch)');
+  // Repository status (#7): latest run per workflow on a branch.
+  db.exec('CREATE INDEX IF NOT EXISTS idx_runs_workflow_branch_created ON workflow_runs(workflow_id, branch, created_at DESC, id DESC)');
 }
 
 module.exports = { runMigrations };
