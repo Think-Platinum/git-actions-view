@@ -203,6 +203,17 @@
                   </v-icon>
                   {{ repo.owner }}/{{ repo.name }}
                   <v-chip
+                    size="x-small"
+                    variant="outlined"
+                    class="ml-2"
+                    :color="repo.effectiveDefaultBranch ? undefined : 'warning'"
+                    :title="repo.effectiveDefaultBranch ? 'Default branch used for status' : 'Default branch not known yet'"
+                    data-testid="repo-branch-chip"
+                  >
+                    <v-icon start size="x-small">mdi-source-branch</v-icon>
+                    {{ repo.effectiveDefaultBranch || 'unknown' }}
+                  </v-chip>
+                  <v-chip
                     v-if="syncState.syncingRepo === `${repo.owner}/${repo.name}`"
                     size="x-small"
                     color="primary"
@@ -268,6 +279,7 @@
                       </div>
                     </div>
                     <div v-else class="text-body-2 text-medium-emphasis">Failed to load metrics.</div>
+                    <RepoBranchSettings :repo="repo" @updated="(updated) => onRepoUpdated(repo, updated)" />
                   </v-card>
                 </td>
               </tr>
@@ -325,6 +337,7 @@ import {
 } from '@/services/api'
 import { useSyncStatus } from '@/composables/useSyncStatus'
 import ApiTokensCard from '@/components/ApiTokensCard.vue'
+import RepoBranchSettings from '@/components/RepoBranchSettings.vue'
 
 const syncState = useSyncStatus()
 
@@ -534,6 +547,10 @@ async function toggleHidden(repo, hidden) {
   } catch {
     // Revert on error
   }
+}
+
+function onRepoUpdated(repo, updated) {
+  if (updated) Object.assign(repo, updated)
 }
 
 function confirmDelete(repo) {

@@ -33,7 +33,28 @@ describe('syncDispatcher', () => {
     dispatcher.stop();
   });
 
-  test('start() calls syncRepoRuns immediately', () => {
+  test('discovery refreshes each repo\'s default branch before syncing its runs (#5)', async () => {
+    const rateLimitTracker = require('../src/services/rateLimitTracker');
+    rateLimitTracker.shouldPause.mockReturnValue(false);
+    const reposService = require('../src/services/reposService');
+    reposService.getVisibleRepos.mockReturnValue([{ owner: 'org', name: 'repo' }]);
+    reposService.refreshDefaultBranch.mockResolvedValue({});
+    const syncService = require('../src/services/syncService');
+    syncService.syncRepoRuns.mockResolvedValue([]);
+
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+    const dispatcher = require('../src/services/syncDispatcher');
+    dispatcher.start();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(reposService.refreshDefaultBranch).toHaveBeenCalledWith({ owner: 'org', name: 'repo' }, 'test-token');
+    expect(syncService.syncRepoRuns).toHaveBeenCalledWith('org', 'repo', 'test-token');
+    consoleSpy.mockRestore();
+    dispatcher.stop();
+  });
+
+  test('start() calls syncRepoRuns immediately', async () => {
     const rateLimitTracker = require('../src/services/rateLimitTracker');
     rateLimitTracker.shouldPause.mockReturnValue(false);
     const reposService = require('../src/services/reposService');
@@ -44,6 +65,9 @@ describe('syncDispatcher', () => {
     const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
     const dispatcher = require('../src/services/syncDispatcher');
     dispatcher.start();
+    // The default-branch refresh (#5) is awaited first, within the same cycle.
+    await Promise.resolve();
+    await Promise.resolve();
 
     expect(syncService.syncRepoRuns).toHaveBeenCalledWith('org', 'repo', 'test-token');
     consoleSpy.mockRestore();

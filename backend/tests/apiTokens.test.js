@@ -182,7 +182,7 @@ describe('API tokens (#9 backend slice)', () => {
       const limited = await request(app).get('/test/token-eligible').set('Authorization', 'Bearer gav_guess');
       expect(limited.status).toBe(429);
       expect(limited.body).toEqual({ error: 'Too many requests' });
-    });
+    }, 20000); // 121 sequential requests can exceed the 5 s default under a parallel run
 
     test('token management throttles a client after 30 requests in 15 minutes', async () => {
       const { app } = load();
@@ -190,7 +190,7 @@ describe('API tokens (#9 backend slice)', () => {
         expect((await request(app).get('/api/v1/tokens').set('x-test-session', '1')).status).toBe(200);
       }
       expect((await request(app).get('/api/v1/tokens').set('x-test-session', '1')).status).toBe(429);
-    });
+    }, 20000);
   });
 
   describe('csrfProtection', () => {

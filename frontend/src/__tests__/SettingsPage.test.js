@@ -204,4 +204,77 @@ describe('SettingsPage', () => {
     expect(items).toHaveLength(1)
     expect(items[0].fullName).toBe('test-org/other-repo')
   })
+
+  describe('default branch (#5)', () => {
+    const repoRow = (over = {}) => ({
+      id: 1, owner: 'test-org', name: 'my-repo', hidden: 0, created_at: '2026-01-01',
+      defaultBranch: 'develop', defaultBranchOverride: null, effectiveDefaultBranch: 'develop',
+      ...over,
+    })
+
+    async function expandRepo(wrapper) {
+      const row = wrapper.findAll('tr').find(r => r.text().includes('test-org/my-repo'))
+      await row.trigger('click')
+      await flushPromises()
+    }
+
+    beforeEach(() => {
+      mockFetchRepoStats.mockResolvedValue({
+        runCount: 1, workflowCount: 1, jobCount: 1, estimatedSizeBytes: 0, latestRun: null,
+      })
+    })
+
+    it('shows the branch used for status on the repo row, and unknown when there is none', async () => {
+      mockFetchRepos.mockResolvedValue({
+        repos: [repoRow(), repoRow({ id: 2, name: 'new-repo', defaultBranch: null, effectiveDefaultBranch: null })],
+      })
+      const wrapper = mountSettings()
+      await flushPromises()
+      const chips = wrapper.findAll('[data-testid="repo-branch-chip"]').map(c => c.text())
+      expect(chips).toEqual(['develop', 'unknown'])
+    })
+
+    it('renders the detected branch when a repo is expanded', async () => {
+      mockFetchRepos.mockResolvedValue({ repos: [repoRow()] })
+      const wrapper = mountSettings()
+      await flushPromises()
+      await expandRepo(wrapper)
+      expect(wrapper.find('[data-testid="detected-branch"]').text()).toBe('develop')
+      expect(wrapper.find('[data-testid="effective-branch"]').text()).toBe('develop')
+    })
+
+    it('saves an override and shows it as the branch in use', async () => {
+      mockFetchRepos.mockResolvedValue({ repos: [repoRow()] })
+      mockUpdateRepo.mockResolvedValue({
+        repo: repoRow({ defaultBranchOverride: 'release', effectiveDefaultBranch: 'release' }),
+      })
+      const wrapper = mountSettings()
+      await flushPromises()
+      await expandRepo(wrapper)
+
+      await wrapper.find('[data-testid="branch-override-input"] input').setValue('  release  ')
+      await wrapper.find('[data-testid="save-branch-override"]').trigger('click')
+      await flushPromises()
+
+      expect(mockUpdateRepo).toHaveBeenCalledWith(1, { defaultBranchOverride: 'release' })
+      expect(wrapper.find('[data-testid="effective-branch"]').text()).toBe('release')
+      expect(wrapper.findAll('[data-testid="repo-branch-chip"]')[0].text()).toBe('release')
+    })
+
+    it('clears an override back to GitHub\'s branch', async () => {
+      mockFetchRepos.mockResolvedValue({
+        repos: [repoRow({ defaultBranchOverride: 'release', effectiveDefaultBranch: 'release' })],
+      })
+      mockUpdateRepo.mockResolvedValue({ repo: repoRow() })
+      const wrapper = mountSettings()
+      await flushPromises()
+      await expandRepo(wrapper)
+
+      await wrapper.find('[data-testid="clear-branch-override"]').trigger('click')
+      await flushPromises()
+
+      expect(mockUpdateRepo).toHaveBeenCalledWith(1, { defaultBranchOverride: null })
+      expect(wrapper.find('[data-testid="effective-branch"]').text()).toBe('develop')
+    })
+  })
 })

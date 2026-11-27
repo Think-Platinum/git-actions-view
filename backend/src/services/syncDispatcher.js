@@ -39,6 +39,8 @@ async function runDiscovery() {
     for (const repo of repos) {
       const repoFullName = `${repo.owner}/${repo.name}`;
       broadcast('sync:start', { repo: repoFullName, type: 'discovery' });
+      // Default branch (#5): re-read from GitHub at most hourly.
+      await reposService.refreshDefaultBranch(repo, token);
       const newActive = await syncRepoRuns(repo.owner, repo.name, token);
       broadcast('sync:complete', { repo: repoFullName, type: 'discovery' });
 
@@ -167,6 +169,8 @@ async function syncSingleRepo(owner, name) {
   const repoFullName = `${owner}/${name}`;
   try {
     broadcast('sync:start', { repo: repoFullName, type: 'single' });
+    // A newly added repo reads its default branch straight away (#5).
+    await reposService.refreshDefaultBranch({ owner, name }, token, { force: true });
     const newActive = await syncRepoRuns(owner, name, token);
     broadcast('sync:complete', { repo: repoFullName, type: 'single' });
     for (const run of newActive) {

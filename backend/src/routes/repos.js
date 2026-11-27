@@ -13,7 +13,7 @@ const router = express.Router();
  * GET /api/v1/repos — list all repos (including hidden).
  */
 router.get('/api/v1/repos', ensureAuthenticated, (req, res) => {
-  const repos = reposService.getAllRepos();
+  const repos = reposService.getAllRepos().map(reposService.toApi);
   res.json({ repos });
 });
 
@@ -34,26 +34,39 @@ router.post('/api/v1/repos', ensureAuthenticated, async (req, res) => {
   // Trigger immediate sync for the new repo
   syncDispatcher.syncSingleRepo(repo.owner, repo.name);
 
-  res.status(201).json({ repo });
+  res.status(201).json({ repo: reposService.toApi(repo) });
 });
 
 /**
- * PUT /api/v1/repos/:id — update repo (toggle hidden).
+ * PUT /api/v1/repos/:id — update a repo: `hidden` and/or
+ * `defaultBranchOverride` (#5; a string sets it, null or '' clears it).
  */
 router.put('/api/v1/repos/:id', ensureAuthenticated, (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const { hidden } = req.body;
+  const body = req.body || {};
+  const hasHidden = body.hidden !== undefined;
+  const hasOverride = Object.prototype.hasOwnProperty.call(body, 'defaultBranchOverride');
 
-  if (hidden === undefined) {
-    return res.status(400).json({ error: 'hidden field is required' });
+  if (!hasHidden && !hasOverride) {
+    return res.status(400).json({ error: 'hidden or defaultBranchOverride is required' });
   }
 
-  const repo = reposService.updateRepo(id, { hidden });
+  let override;
+  if (hasOverride) {
+    override = reposService.normaliseBranchOverride(body.defaultBranchOverride);
+    if (override.error) {
+      return res.status(400).json({ error: override.error });
+    }
+  }
+
+  let repo = reposService.getAllRepos().find(r => r.id === id);
   if (!repo) {
     return res.status(404).json({ error: 'Repository not found' });
   }
+  if (hasHidden) repo = reposService.updateRepo(id, { hidden: body.hidden });
+  if (hasOverride) repo = reposService.setDefaultBranchOverride(id, override.value);
 
-  res.json({ repo });
+  res.json({ repo: reposService.toApi(repo) });
 });
 
 /**
