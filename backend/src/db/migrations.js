@@ -138,6 +138,17 @@ function runMigrations(db) {
       // Column already exists - ignore
     }
   }
+
+  // Which workflows count toward status (#6): an explicit include/exclude, and
+  // the branch for which GitHub was last asked for push evidence.
+  for (const column of ['status_mode TEXT', 'push_checked_branch TEXT']) {
+    try {
+      db.exec(`ALTER TABLE workflows ADD COLUMN ${column}`);
+    } catch (e) {
+      // Column already exists - ignore
+    }
+  }
+  db.exec('CREATE INDEX IF NOT EXISTS idx_runs_workflow_event_branch ON workflow_runs(workflow_id, event, branch)');
 }
 
 module.exports = { runMigrations };

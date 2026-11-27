@@ -154,3 +154,16 @@ export function revokeApiToken(id) {
     method: 'DELETE',
   })
 }
+
+// Workflow selection (#6): which workflows count toward a repo's status.
+export function fetchRepoWorkflows(repoId) {
+  return request(`/api/v1/repos/${repoId}/workflows`)
+}
+
+export function setWorkflowStatusMode(repoId, workflowId, statusMode) {
+  return request(`/api/v1/repos/${repoId}/workflows/${workflowId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ statusMode }),
+  })
+}

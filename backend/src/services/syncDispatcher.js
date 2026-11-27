@@ -3,6 +3,10 @@ const { syncRepoRuns, syncActiveRun } = require('./syncService');
 const reposService = require('./reposService');
 const { broadcast } = require('./sseManager');
 const rateLimitTracker = require('./rateLimitTracker');
+const workflowSelection = require('./workflowSelection');
+
+// GitHub calls per discovery cycle for push-evidence backfill (#6).
+const PUSH_BACKFILL_BUDGET = 10;
 
 // Set of active (in-flight) runs: { id, owner, repo, trackedSince }
 const activeRuns = new Map();
@@ -35,6 +39,7 @@ async function runDiscovery() {
     const repos = reposService.getVisibleRepos();
     let successCount = 0;
     let failCount = 0;
+    const backfillBudget = { remaining: PUSH_BACKFILL_BUDGET };
 
     for (const repo of repos) {
       const repoFullName = `${repo.owner}/${repo.name}`;
@@ -50,6 +55,13 @@ async function runDiscovery() {
       }
 
       successCount++;
+      // Push evidence for workflows GAV has only seen run manually (#6).
+      try {
+        const current = reposService.getVisibleRepos().find(r => r.owner === repo.owner && r.name === repo.name) || repo;
+        await workflowSelection.backfillPushEvidence(current, token, backfillBudget);
+      } catch (err) {
+        console.warn(`[workflows] ${repoFullName}: push evidence backfill failed: ${err.message}`);
+      }
       for (const run of newActive) {
         const key = `${run.owner}/${run.repo}/${run.id}`;
         if (!activeRuns.has(key)) {
