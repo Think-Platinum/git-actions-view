@@ -29,6 +29,15 @@ const sessionRateLimit = rateLimit({
   message: TOO_MANY,
 });
 
+/** Limit for unauthenticated operational routes such as /api/health (#20). */
+const publicRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 120,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: TOO_MANY,
+});
+
 /** Stricter limit for token management (create, list, revoke). */
 const tokenAdminRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -125,6 +134,7 @@ module.exports = {
   ensureAuthenticated,
   allowApiToken,
   apiTokenRateLimit,
+  publicRateLimit,
   tokenAdminRateLimit,
   sessionRateLimit,
   csrfProtection,

@@ -43,6 +43,7 @@ app.use(
 setupPassport(app);
 
 // Routes
+app.use(require('./routes/health'));
 app.use(require('./routes/auth'));
 app.use(require('./routes/config'));
 app.use(require('./routes/runs'));

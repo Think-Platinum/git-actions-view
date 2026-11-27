@@ -1,6 +1,6 @@
 {
   "name": "gitactionsview-backend",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "GitActionsView - Chronological GitHub Actions run log",
   "main": "src/index.js",
   "scripts": {
